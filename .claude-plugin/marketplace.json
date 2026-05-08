@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "uniforce-plugins",
+  "description": "Uniforce internal Claude Code plugins",
+  "owner": {
+    "name": "Ryan Tseng",
+    "email": "ryan.tseng@uniforce.com.tw",
+    "url": "https://github.com/ryantseng24"
+  },
+  "plugins": [
+    {
+      "name": "ccusage-report",
+      "description": "Collect Claude Code monthly usage (token cost via ccusage + LoC + acceptance rate from JSONL) and submit to internal Google Form for team-level reporting.",
+      "source": "./plugins/ccusage-report",
+      "category": "internal-tools",
+      "author": {
+        "name": "Ryan Tseng",
+        "email": "ryan.tseng@uniforce.com.tw"
+      }
+    }
+  ]
+}

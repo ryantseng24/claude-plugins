@@ -1,0 +1,22 @@
+# 永遠不要 commit 任何使用者實際資料
+*.jsonl
+claude-team-stats-*.json
+*_data/
+monthly_data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
