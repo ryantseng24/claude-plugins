@@ -4,13 +4,17 @@ description: >
   收集 Claude Code 月度使用量（token 成本 + Lines of Code + 採納率）並提交給技術長。
   當使用者提到「ccusage」、「使用量報告」、「提交給技術長」、「收集數據」、
   「usage report」、「月度報告」、「team monthly stats」時觸發此 skill。
-version: 1.1.0
+version: 1.2.0
 ---
 
-# ccusage-report v1.1.0：Claude Code 月度用量收集與提交
+# ccusage-report v1.2.0：Claude Code 月度用量收集與提交
 
 你是一個協助工程師收集 Claude Code 月度使用量並提交給技術長的助手。
-整個流程分為 **6 個步驟**，請依序執行，每一步都要與工程師互動確認。
+整個流程分為 **8 個步驟**，請依序執行，前 7 步要與工程師互動確認，最後 1 步自動執行。
+
+**v1.2.0 相對於 v1.1.0 的變動**：
+- 新增 Step 8：完整資料（CSV + markdown summary，含上傳時間）自動同步到中央 Dropbox 倉庫，省去 Google Form schema 限制
+- 上傳失敗不阻塞流程結束，本機 JSON 始終是最後保險
 
 **v1.1.0 相對於 v1.0 的變動**：
 - 新增 Lines of Code 與採納率（Edit/Write/MultiEdit 工具呼叫統計）
@@ -249,11 +253,39 @@ try {
 
 ---
 
+## Step 8: 自動同步至中央 Dropbox 倉庫（v1.2.0 新增）
+
+無論 Step 7 的 Google Form 提交成功或 fallback，都接著嘗試把完整資料（CSV + markdown summary）上傳到技術長的 Dropbox App folder。**此步驟不需詢問工程師**（已在 Step 6 確認過資料），自動執行，失敗不阻塞 skill 結束。
+
+**Mac/Linux/WSL**：
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/upload_to_dropbox.py" \
+  --stats "$HOME/claude-team-stats-$MONTH.json"
+```
+
+**Windows 原生 PowerShell**：
+```powershell
+python "$env:CLAUDE_PLUGIN_ROOT/scripts/upload_to_dropbox.py" `
+  --stats "$env:USERPROFILE\claude-team-stats-$MONTH.json"
+```
+
+腳本會：
+1. 讀取本機 stats JSON
+2. 產生 CSV（單列彙整資料）+ markdown summary（含上傳時間）
+3. 上傳到 `Apps/uniforce-ccusage-reports/<MONTH>/<engineer>_<upload_date>.{csv,md}`
+4. 失敗時印明確訊息，但**不 raise exception**
+
+依輸出顯示：
+- 看到 `[upload] ✅ 已同步至中央倉庫` → 告知工程師：「✅ 已將完整資料同步至中央倉庫，提交流程結束。」
+- 看到任何 `[upload] WARN:` 或 `FAIL:` → 告知工程師：「⚠️ 自動上傳到中央倉庫失敗，但你的資料 (`~/claude-team-stats-{$MONTH}.json`) 已保留在本機，可手動傳給技術長 Ryan。流程結束。」
+
+---
+
 ## 重要注意事項
 
 - **隱私**：整個過程只收集統計數據（token 用量、模型名稱、edit 工具呼叫次數、行數），**不讀取或傳送任何對話內容、檔案內容、檔案名稱**
 - **環境**：`npx ccusage@latest` 是臨時執行，不會安裝任何全域套件
-- **互動**：每一步都要等工程師確認後才繼續，不要自動跳過確認步驟
+- **互動**：Step 1-7 每一步都要等工程師確認後才繼續，**Step 8 自動執行不需確認**（資料已在 Step 6 確認過）
 - **尊重**：若工程師對任何步驟有疑慮，耐心解釋並尊重其決定
 - **團隊欄位**：「紘揚科技」、「AI事業群」、「創泓技術服務」三選一，必須完全匹配
-- **本機 fallback**：`~/claude-team-stats-<MONTH>.json` 即使提交成功也會留下，作為工程師自己核對用
+- **本機 fallback**：`~/claude-team-stats-<MONTH>.json` 即使 Form 提交與 Dropbox 同步皆成功也會留下，作為工程師自己核對用
