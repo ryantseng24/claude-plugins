@@ -4,16 +4,21 @@ description: >
   收集 Claude Code 月度使用量（token 成本 + Lines of Code + 採納率）並提交給技術長。
   當使用者提到「ccusage」、「使用量報告」、「提交給技術長」、「收集數據」、
   「usage report」、「月度報告」、「team monthly stats」時觸發此 skill。
-version: 1.2.0
+version: 1.3.0
 ---
 
-# ccusage-report v1.2.0：Claude Code 月度用量收集與提交
+# ccusage-report v1.3.0：Claude Code 月度用量收集與提交
 
 你是一個協助工程師收集 Claude Code 月度使用量並提交給技術長的助手。
-整個流程分為 **8 個步驟**，請依序執行，前 7 步要與工程師互動確認，最後 1 步自動執行。
+整個流程分為 **7 個步驟**，請依序執行，前 6 步要與工程師互動確認，最後 1 步自動執行。
+
+**v1.3.0 相對於 v1.2.0 的變動**：
+- **移除 Google Form 提交（原 Step 7）** — 改以 Dropbox 為唯一上傳通道，避免 Form schema 維護成本
+- Dropbox 同步從原 Step 8 提升為 Step 7（流程簡化為 7 步）
+- 完整資料（含 LoC / 採納率）一律進 Dropbox，不再受限於 Form schema 欄位
 
 **v1.2.0 相對於 v1.1.0 的變動**：
-- 新增 Step 8：完整資料（CSV + markdown summary，含上傳時間）自動同步到中央 Dropbox 倉庫，省去 Google Form schema 限制
+- 新增 Step 8：完整資料（CSV + markdown summary，含上傳時間）自動同步到中央 Dropbox 倉庫
 - 上傳失敗不阻塞流程結束，本機 JSON 始終是最後保險
 
 **v1.1.0 相對於 v1.0 的變動**：
@@ -200,62 +205,9 @@ python "$env:CLAUDE_PLUGIN_ROOT/scripts/compute_stats.py" `
 
 ---
 
-## Step 7: 提交到 Google Form（含本機 fallback）
+## Step 7: 自動同步至中央 Dropbox 倉庫
 
-工程師確認後，準備提交。
-
-**Form 提交（Mac/Linux/WSL）**：
-```bash
-HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" \
-  'https://docs.google.com/forms/d/e/1FAIpQLSfnqcitK2yjDCkHgjpnsCHyc8tnYWfQf-nWQvZ8aSPzm5XW9Q/formResponse' \
-  --data-urlencode "entry.636851699=$IDENTITY" \
-  --data-urlencode "entry.1745500162=$TEAM" \
-  --data-urlencode "entry.1246906968=$MONTH" \
-  --data-urlencode "entry.1882728501=$TOTAL_TOKENS" \
-  --data-urlencode "entry.1538493346=$TOTAL_COST" \
-  --data-urlencode "entry.106552908=$MODEL_BREAKDOWN" \
-  --data-urlencode "entry.1097636209=$RAW_JSON")
-echo "HTTP_CODE=$HTTP_CODE"
-```
-
-**Windows 原生 PowerShell 改用 `Invoke-WebRequest`**：
-```powershell
-$body = @{
-  "entry.636851699" = $IDENTITY
-  "entry.1745500162" = $TEAM
-  "entry.1246906968" = $MONTH
-  "entry.1882728501" = $TOTAL_TOKENS
-  "entry.1538493346" = $TOTAL_COST
-  "entry.106552908"  = $MODEL_BREAKDOWN
-  "entry.1097636209" = $RAW_JSON
-}
-try {
-  $r = Invoke-WebRequest -Uri 'https://docs.google.com/forms/d/e/1FAIpQLSfnqcitK2yjDCkHgjpnsCHyc8tnYWfQf-nWQvZ8aSPzm5XW9Q/formResponse' -Method POST -Body $body
-  Write-Output "HTTP_CODE=$($r.StatusCode)"
-} catch {
-  Write-Output "HTTP_CODE=$($_.Exception.Response.StatusCode.value__)"
-}
-```
-
-> ⚠️ **Form Schema 待更新**：目前 `entry.*` 對應 v1.0 的欄位（無 LoC / 採納率）。技術長更新 Form schema 後，本 SKILL.md 會新增 `entry.LOC_ACCEPTED` 等欄位。
-
-依 HTTP code 處理：
-- `200` → 提交成功，告知：「✅ 已成功提交使用量報告給技術長，感謝配合！」
-- 其他 → **觸發本機 fallback**：
-
-> ⚠️ Google Form 提交失敗（HTTP {code}）。完整資料已存在本機，請執行下列任一動作：
->
-> 1. 把以下檔案傳給技術長 Ryan：
->    `~/claude-team-stats-{$MONTH}.json`
-> 2. 或截圖上方的摘要（Step 6 內容）傳給 Ryan
->
-> 失敗原因可能是：網路連線、表單關閉、表單 schema 變動。技術長收到後可手動匯入。
-
----
-
-## Step 8: 自動同步至中央 Dropbox 倉庫（v1.2.0 新增）
-
-無論 Step 7 的 Google Form 提交成功或 fallback，都接著嘗試把完整資料（CSV + markdown summary）上傳到技術長的 Dropbox App folder。**此步驟不需詢問工程師**（已在 Step 6 確認過資料），自動執行，失敗不阻塞 skill 結束。
+工程師確認後，自動上傳完整資料（CSV + markdown summary，含上傳時間）到技術長的 Dropbox App folder。**此步驟不需再次詢問工程師**（已在 Step 6 確認過資料），自動執行；失敗時印明確訊息但不阻塞 skill 結束。
 
 **Mac/Linux/WSL**：
 ```bash
@@ -277,7 +229,7 @@ python "$env:CLAUDE_PLUGIN_ROOT/scripts/upload_to_dropbox.py" `
 
 依輸出顯示：
 - 看到 `[upload] ✅ 已同步至中央倉庫` → 告知工程師：「✅ 已將完整資料同步至中央倉庫，提交流程結束。」
-- 看到任何 `[upload] WARN:` 或 `FAIL:` → 告知工程師：「⚠️ 自動上傳到中央倉庫失敗，但你的資料 (`~/claude-team-stats-{$MONTH}.json`) 已保留在本機，可手動傳給技術長 Ryan。流程結束。」
+- 看到任何 `[upload] WARN:` 或 `FAIL:` → 告知工程師：「⚠️ 自動上傳到中央倉庫失敗，但你的資料 (`~/claude-team-stats-{$MONTH}.json`) 已保留在本機，請通知技術長 Ryan 手動處理。流程結束。」
 
 ---
 
@@ -285,7 +237,7 @@ python "$env:CLAUDE_PLUGIN_ROOT/scripts/upload_to_dropbox.py" `
 
 - **隱私**：整個過程只收集統計數據（token 用量、模型名稱、edit 工具呼叫次數、行數），**不讀取或傳送任何對話內容、檔案內容、檔案名稱**
 - **環境**：`npx ccusage@latest` 是臨時執行，不會安裝任何全域套件
-- **互動**：Step 1-7 每一步都要等工程師確認後才繼續，**Step 8 自動執行不需確認**（資料已在 Step 6 確認過）
+- **互動**：Step 1-6 每一步都要等工程師確認後才繼續，**Step 7 自動執行不需確認**（資料已在 Step 6 確認過）
 - **尊重**：若工程師對任何步驟有疑慮，耐心解釋並尊重其決定
 - **團隊欄位**：「紘揚科技」、「AI事業群」、「創泓技術服務」三選一，必須完全匹配
-- **本機 fallback**：`~/claude-team-stats-<MONTH>.json` 即使 Form 提交與 Dropbox 同步皆成功也會留下，作為工程師自己核對用
+- **本機 fallback**：`~/claude-team-stats-<MONTH>.json` 即使 Dropbox 同步成功也會留下，作為工程師自己核對用
