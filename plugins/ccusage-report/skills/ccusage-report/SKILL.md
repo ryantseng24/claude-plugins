@@ -4,13 +4,18 @@ description: >
   收集 Claude Code 月度使用量（token 成本 + Lines of Code + 採納率）並提交給技術長。
   當使用者提到「ccusage」、「使用量報告」、「提交給技術長」、「收集數據」、
   「usage report」、「月度報告」、「team monthly stats」時觸發此 skill。
-version: 1.4.0
+version: 1.5.0
 ---
 
-# ccusage-report v1.4.0：Claude Code 月度用量收集與提交
+# ccusage-report v1.5.0：Claude Code 月度用量收集與提交
 
 你是一個協助工程師收集 Claude Code 月度使用量並提交給技術長的助手。
 整個流程分為 **7 個步驟**，請依序執行，前 6 步要與工程師互動確認，最後 1 步自動執行。
+
+**v1.5.0 相對於 v1.4.0 的變動**：
+- **新增「限額壓力」衍生指標**：`compute_stats.py` 額外輸出 `peak_5h_fresh`／`peak_7d_fresh`／`peak_5h_total`／`concentration_5h`／`active_days`，供 Premium/Standard 方案配置研究（限額看的是 5h/週尖峰用量，非月總 token）。
+- **與既有 token/成本完全脫鉤**：新指標沿用相同的去重事件集（依 `(message.id, requestId)` 去重 + `type==assistant` + `claude-` 模型），純粹額外加總，**不會改變既有的 token 數、成本、LoC、採納率**。
+- **隱私不變**：新指標只用每筆訊息的 timestamp + token 數量計算，**不讀取任何對話內容**。
 
 **v1.4.0 相對於 v1.3.0 的變動**：
 - **Step 3 月份強制確認**：工程師必須明確回覆「確認」或指定其他月份，agent 才能繼續，避免誤把當月當上月跑
@@ -246,7 +251,7 @@ python "$env:CLAUDE_PLUGIN_ROOT/scripts/upload_to_dropbox.py" `
 
 ## 重要注意事項
 
-- **隱私**：整個過程只收集統計數據（token 用量、模型名稱、edit 工具呼叫次數、行數），**不讀取或傳送任何對話內容、檔案內容、檔案名稱**
+- **隱私**：整個過程只收集統計數據（token 用量、模型名稱、edit 工具呼叫次數、行數、**用量時間戳——僅用於計算限額壓力尖峰**），**不讀取或傳送任何對話內容、檔案內容、檔案名稱**
 - **環境**：`npx ccusage@latest` 是臨時執行，不會安裝任何全域套件
 - **互動**：Step 1-6 每一步都要等工程師確認後才繼續，**Step 7 自動執行不需確認**（資料已在 Step 6 確認過）
 - **尊重**：若工程師對任何步驟有疑慮，耐心解釋並尊重其決定

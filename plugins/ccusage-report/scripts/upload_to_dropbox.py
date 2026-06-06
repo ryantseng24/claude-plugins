@@ -178,8 +178,11 @@ def stats_to_csv(stats: dict, upload_date: str) -> bytes:
         "cache_create_tokens", "cache_read_tokens",
         "cost_usd", "loc_accepted", "edits_proposed", "edits_rejected",
         "acceptance_rate", "models_used", "script_version",
+        "peak_5h_fresh", "peak_7d_fresh", "peak_5h_total",
+        "concentration_5h", "active_days",
     ]
     tokens = stats.get("tokens") or {}
+    lp = stats.get("limit_pressure") or {}
     rate = stats.get("acceptance_rate")
     row = [
         upload_date,
@@ -199,6 +202,11 @@ def stats_to_csv(stats: dict, upload_date: str) -> bytes:
         f"{rate:.4f}" if isinstance(rate, (int, float)) else "",
         ";".join(stats.get("models_used") or []),
         stats.get("script_version", ""),
+        lp.get("peak_5h_fresh", ""),
+        lp.get("peak_7d_fresh", ""),
+        lp.get("peak_5h_total", ""),
+        lp.get("concentration_5h", ""),
+        lp.get("active_days", ""),
     ]
     w.writerow(headers)
     w.writerow(row)
@@ -207,6 +215,7 @@ def stats_to_csv(stats: dict, upload_date: str) -> bytes:
 
 def stats_to_markdown(stats: dict, upload_iso: str) -> bytes:
     tokens = stats.get("tokens") or {}
+    lp = stats.get("limit_pressure") or {}
     rate = stats.get("acceptance_rate")
     rate_str = f"{rate * 100:.1f}%" if isinstance(rate, (int, float)) else "N/A"
     cost = stats.get("cost_usd", 0)
@@ -242,6 +251,13 @@ def stats_to_markdown(stats: dict, upload_iso: str) -> bytes:
         f"- Edits 提案數: {stats.get('edits_proposed', 0):,}",
         f"- Edits 拒絕數: {stats.get('edits_rejected', 0):,}",
         f"- 採納率: {rate_str}",
+        "",
+        "## 限額壓力（5h／週尖峰，方案配置研究用，非成本）",
+        f"- 5h 滾動尖峰 (fresh): {lp.get('peak_5h_fresh', 0):,}",
+        f"- 7d 滾動尖峰 (fresh): {lp.get('peak_7d_fresh', 0):,}",
+        (f"- 5h 集中度 (尖峰/月量): {lp.get('concentration_5h', 0) * 100:.1f}%"
+         if isinstance(lp.get('concentration_5h'), (int, float)) else "- 5h 集中度: N/A"),
+        f"- 活躍天數: {lp.get('active_days', 0)}",
         "",
         f"_由 ccusage-report plugin 上傳，script_version={stats.get('script_version','?')}_",
         "",

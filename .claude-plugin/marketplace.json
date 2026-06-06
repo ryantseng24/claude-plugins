@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "ccusage-report",
-      "description": "Collect Claude Code monthly usage (token cost via ccusage + LoC + acceptance rate from JSONL) and submit to internal Google Form for team-level reporting.",
+      "description": "Collect Claude Code monthly usage (token cost + LoC + acceptance rate + limit-pressure from JSONL) and auto-sync to the central Dropbox repo for team-level reporting.",
       "source": "./plugins/ccusage-report",
       "category": "internal-tools",
       "author": {
