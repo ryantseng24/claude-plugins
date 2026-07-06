@@ -41,7 +41,7 @@ version: 1.5.0
 
 先告訴工程師目前 skill 版本：
 
-> 即將執行 ccusage-report v1.1.0。本次會收集你上個月的 Claude Code 使用統計（token 成本 + LoC + 採納率），最後提交給技術長。**全程只統計用量數據，不讀取任何對話內容**。
+> 即將執行 ccusage-report v1.5.0。本次會收集你上個月的 Claude Code 使用統計（token 成本 + LoC + 採納率 + 限額壓力），最後提交給技術長。**全程只統計用量數據，不讀取任何對話內容**。
 
 接著偵測平台。先嘗試 Unix 工具（適用 Mac / Linux / WSL）：
 
@@ -192,7 +192,7 @@ python "$env:CLAUDE_PLUGIN_ROOT/scripts/compute_stats.py" `
 
 整合 Step 4（ccusage）與 Step 5（LoC / 採納率）的數據，以易讀格式顯示：
 
-> ## ccusage-report v1.1.0 摘要
+> ## ccusage-report v1.5.0 摘要
 >
 > - **工程師**：{$IDENTITY}
 > - **團隊**：{$TEAM}
