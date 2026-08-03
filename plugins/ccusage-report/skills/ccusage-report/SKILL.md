@@ -4,13 +4,19 @@ description: >
   收集 Claude Code 月度使用量（token 成本 + Lines of Code + 採納率）並提交給技術長。
   當使用者提到「ccusage」、「使用量報告」、「提交給技術長」、「收集數據」、
   「usage report」、「月度報告」、「team monthly stats」時觸發此 skill。
-version: 1.5.0
+version: 1.6.0
 ---
 
-# ccusage-report v1.5.0：Claude Code 月度用量收集與提交
+# ccusage-report v1.6.0：Claude Code 月度用量收集與提交
 
 你是一個協助工程師收集 Claude Code 月度使用量並提交給技術長的助手。
 整個流程分為 **7 個步驟**，請依序執行，前 6 步要與工程師互動確認，最後 1 步自動執行。
+
+**v1.6.0 相對於 v1.5.0 的變動**：
+- **修正 Claude 5 系列計價**：先前 `claude-fable-5` 不符 opus/sonnet/haiku 家族後援規則、被計為 $0 而低估成本；現補上正確定價（對照 LiteLLM），並補入 `claude-opus-4-8`／`claude-opus-5`／`claude-sonnet-5`。
+- **Sonnet 5 導入期優惠價**：`claude-sonnet-5` 在 2026-08-31 前以 $2/$10（每 Mtok）計，依「用量所屬月份」自動於 2026-09 起切回標準 $3/$15。
+- **未知模型防呆**：遇價目表未收錄的新模型改印 stderr 警告（不再靜默 $0），避免整月成本被漏算。
+- **流程與隱私不變**：7 步流程、去重/過濾、限額壓力指標與「不讀對話內容」原則均不受影響。
 
 **v1.5.0 相對於 v1.4.0 的變動**：
 - **新增「限額壓力」衍生指標**：`compute_stats.py` 額外輸出 `peak_5h_fresh`／`peak_7d_fresh`／`peak_5h_total`／`concentration_5h`／`active_days`，供 Premium/Standard 方案配置研究（限額看的是 5h/週尖峰用量，非月總 token）。
@@ -41,7 +47,7 @@ version: 1.5.0
 
 先告訴工程師目前 skill 版本：
 
-> 即將執行 ccusage-report v1.5.0。本次會收集你上個月的 Claude Code 使用統計（token 成本 + LoC + 採納率 + 限額壓力），最後提交給技術長。**全程只統計用量數據，不讀取任何對話內容**。
+> 即將執行 ccusage-report v1.6.0。本次會收集你上個月的 Claude Code 使用統計（token 成本 + LoC + 採納率 + 限額壓力），最後提交給技術長。**全程只統計用量數據，不讀取任何對話內容**。
 
 接著偵測平台。先嘗試 Unix 工具（適用 Mac / Linux / WSL）：
 
@@ -192,7 +198,7 @@ python "$env:CLAUDE_PLUGIN_ROOT/scripts/compute_stats.py" `
 
 整合 Step 4（ccusage）與 Step 5（LoC / 採納率）的數據，以易讀格式顯示：
 
-> ## ccusage-report v1.5.0 摘要
+> ## ccusage-report v1.6.0 摘要
 >
 > - **工程師**：{$IDENTITY}
 > - **團隊**：{$TEAM}
