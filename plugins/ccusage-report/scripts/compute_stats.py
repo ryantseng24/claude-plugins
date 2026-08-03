@@ -26,26 +26,39 @@ from collections import defaultdict, deque
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 # LiteLLM-aligned pricing per 1M tokens (USD). Anthropic public direct API.
-# Anthropic re-priced Opus 4.5/4.6/4.7 to $5/$25 (vs older Opus 4/4.1 $15/$75).
+# Anthropic re-priced Opus 4.5+ to $5/$25 (vs older Opus 4/4.1 $15/$75).
+# Claude 5 family (fable-5 $10/$50, sonnet-5 $3/$15) + Opus 4.8 added 2026-08.
 PRICING = {
     "claude-opus-4-1":   {"in": 15.00, "out": 75.00, "cache_w": 18.75, "cache_r": 1.50},
     "claude-opus-4":     {"in": 15.00, "out": 75.00, "cache_w": 18.75, "cache_r": 1.50},
     "claude-opus-4-5":   {"in":  5.00, "out": 25.00, "cache_w":  6.25, "cache_r": 0.50},
     "claude-opus-4-6":   {"in":  5.00, "out": 25.00, "cache_w":  6.25, "cache_r": 0.50},
     "claude-opus-4-7":   {"in":  5.00, "out": 25.00, "cache_w":  6.25, "cache_r": 0.50},
+    "claude-opus-4-8":   {"in":  5.00, "out": 25.00, "cache_w":  6.25, "cache_r": 0.50},
+    "claude-opus-5":     {"in":  5.00, "out": 25.00, "cache_w":  6.25, "cache_r": 0.50},
     "claude-sonnet-4":   {"in":  3.00, "out": 15.00, "cache_w":  3.75, "cache_r": 0.30},
     "claude-sonnet-4-5": {"in":  3.00, "out": 15.00, "cache_w":  3.75, "cache_r": 0.30},
     "claude-sonnet-4-6": {"in":  3.00, "out": 15.00, "cache_w":  3.75, "cache_r": 0.30},
+    "claude-sonnet-5":   {"in":  3.00, "out": 15.00, "cache_w":  3.75, "cache_r": 0.30},
     "claude-haiku-4-5":  {"in":  1.00, "out":  5.00, "cache_w":  1.25, "cache_r": 0.10},
+    "claude-fable-5":    {"in": 10.00, "out": 50.00, "cache_w": 12.50, "cache_r": 1.00},
 }
 
+# Sonnet 5 shipped with introductory pricing through 2026-08-31; usage dated
+# 2026-09 onward bills at the standard $3/$15 already in PRICING above. Keyed on
+# the usage's own month, not the report month, so cross-month totals stay right.
+SONNET_5_INTRO_UNTIL = "2026-08"  # inclusive YYYY-MM boundary
+SONNET_5_INTRO = {"in": 2.00, "out": 10.00, "cache_w": 2.50, "cache_r": 0.20}
+
+# Unknown same-family model IDs fall back to that family's latest known price.
 FAMILY_FALLBACK = {
-    "opus":   PRICING["claude-opus-4-7"],
-    "sonnet": PRICING["claude-sonnet-4-6"],
+    "opus":   PRICING["claude-opus-4-8"],
+    "sonnet": PRICING["claude-sonnet-5"],
     "haiku":  PRICING["claude-haiku-4-5"],
+    "fable":  PRICING["claude-fable-5"],
 }
 
 REJECTION_MARKER = "User rejected tool use"
@@ -60,6 +73,9 @@ def claude_projects_dir() -> Path:
     return Path.home() / ".claude" / "projects"
 
 
+_warned_unknown_models: set = set()
+
+
 def lookup_price(model: str):
     if model in PRICING:
         return PRICING[model]
@@ -70,13 +86,23 @@ def lookup_price(model: str):
     for fam, price in FAMILY_FALLBACK.items():
         if fam in model:
             return price
+    # No exact price and no family match -> counted as $0. Warn once per model
+    # so a newly released ID (e.g. a future "fable"-less family) can't silently
+    # drop a whole month's cost to zero the way claude-fable-5 did.
+    if model not in _warned_unknown_models:
+        _warned_unknown_models.add(model)
+        print(f"WARNING: no pricing for model '{model}' — counted as $0. "
+              f"Add it to PRICING in compute_stats.py.", file=sys.stderr)
     return None
 
 
-def cost_for(model: str, usage: dict) -> float:
+def cost_for(model: str, usage: dict, month: str = "") -> float:
     p = lookup_price(model)
     if p is None:
         return 0.0
+    # Sonnet 5 introductory pricing applies to usage dated on/before 2026-08.
+    if model == "claude-sonnet-5" and month and month <= SONNET_5_INTRO_UNTIL:
+        p = SONNET_5_INTRO
     return (
         usage.get("input_tokens", 0)                  * p["in"]      / 1_000_000
         + usage.get("output_tokens", 0)               * p["out"]     / 1_000_000
@@ -207,7 +233,7 @@ def analyze(target_month: str) -> dict:
                                               "cache_creation_input_tokens",
                                               "cache_read_input_tokens"):
                                         bucket[k] += usage.get(k, 0)
-                                    bucket["cost_usd"] += cost_for(model, usage)
+                                    bucket["cost_usd"] += cost_for(model, usage, ts)
                                     bucket["models"].add(model)
                                     if ts == target_month:
                                         edt = _parse_iso(obj.get("timestamp") or "")
